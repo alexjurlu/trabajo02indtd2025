@@ -1,0 +1,351 @@
+---
+title: "Trabajo02"
+author: "Alejandro Jurado Luque"
+date: "2025-10-29"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+
+```{r setup, include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+```
+
+# 1. Definición del Problema de Decisión
+
+## Objetivo
+
+El objetivo de este trabajo es seleccionar la mejor universidad en España para cursar estudios. **La decisión se toma desde la perspectiva de un grupo de estudiantes de Sevilla**, por lo que se analizarán tanto factores académicos y del entorno de la ciudad, como consideraciones personales clave (coste y cercanía).
+
+## Alternativas
+
+Las 6 alternativas (universidades) a evaluar son:
+
+$$
+\begin{array}{ll}
+A_1: \text{UC3M (Madrid)} & A_4: \text{UGR (Granada)} \\
+A_2: \text{UCM (Madrid)} & A_5: \text{USAL (Salamanca)} \\
+A_3: \text{US (Sevilla)} & A_6: \text{UB (Barcelona)} \\
+\end{array}
+$$
+
+## Jerarquía de Criterios
+
+Los 6 criterios de decisión se han agrupado en 3 categorías principales para el análisis AHP:
+
+\begin{enumerate}
+  \item \textbf{C1: Ciudad (Factores de entorno)}
+    \begin{enumerate}
+      \item C1.1: Coste de Vida (€/mes) \textbf{(Minimizar)}
+      \item C1.2: Ambiente Social (Escala 1-10) \textbf{(Maximizar)}
+    \end{enumerate}
+  \item \textbf{C2: Rendimiento Académico (Factores de prestigio)}
+    \begin{enumerate}
+      \item C2.1: Posición en Ranking (Posición) \textbf{(Minimizar)}
+      \item C2.2: Resultados de Investigación (Escala 1-100) \textbf{(Maximizar)}
+    \end{enumerate}
+  \item \textbf{C3: Acceso y Conveniencia (Factores personales)}
+    \begin{enumerate}
+      \item C3.1: Dificultad de Acceso (Escala 1-5) \textbf{(Minimizar)}
+      \item C3.2: Cercanía a Casa (km) \textbf{(Minimizar)}
+    \end{enumerate}
+\end{enumerate}
+
+Dado que el grupo de decisión es de Sevilla, el criterio **C3.2 (Cercanía)** se mide en km desde Sevilla, siendo la US (A3) la alternativa óptima en este factor.
+
+## Matriz de Decisión (Datos de Evaluación)
+
+A continuación, se presenta la matriz de decisión.
+
+Es importante recalcar que, al ser estudiantes de Sevilla, el **Coste de Vida (C1.1)** para la alternativa **A3: US** se ha fijado en **200€**, un valor mucho menor que el resto de ciudades, ya que se asume el coste de vivir en el hogar familiar.
+
+```{r datos_matriz, echo=FALSE, message=FALSE, warning=FALSE}
+matriz_datos <- matrix(
+  c(
+    # C1.1(Min), C1.2(Max), C2.1(Min), C2.2(Max), C3.1(Min), C3.2(Min)
+    600, 8, 5, 88, 5, 530,  # A1: UC3M
+    600, 9, 4, 90, 4, 530,  # A2: UCM
+    200, 8, 15, 75, 3, 0,    # A3: US (Coste cambiado a 200)
+    400, 10, 10, 80, 2, 250,  # A4: UGR
+    380, 9, 20, 65, 2, 460,  # A5: USAL
+    650, 9, 3, 92, 5, 1000  # A6: UB
+  ),
+  nrow = 6, byrow = TRUE
+)
+
+datos_alternativas <- as.data.frame(matriz_datos)
+
+colnames(datos_alternativas) <- c("C1.1 Coste Vida (Min)", "C1.2 Ambiente (Max)", "C2.1 Ranking (Min)", "C2.2 Investig (Max)", "C3.1 Dificultad (Min)", "C3.2 Cercanía (Min)")
+rownames(datos_alternativas) <- c("A1: UC3M", "A2: UCM", "A3: US", "A4: UGR", "A5: USAL", "A6: UB")
+
+library(kableExtra)
+
+kable(datos_alternativas, caption = "Matriz de Decisión: Alternativas vs. Criterios") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = F, position = "left")
+
+```
+
+```{r ahp_saw, echo=FALSE, message=FALSE, warning=FALSE}
+library(ggplot2)
+library(knitr)
+
+source("teoriadecision_funciones_multicriterio.R")
+
+options(scipen = 999)
+
+matriz_datos <- matrix(
+  c(
+    600, 8, 5, 88, 5, 530,
+    600, 9, 4, 90, 4, 530,
+    200, 8, 15, 75, 3, 0,
+    400, 10, 10, 80, 2, 250,
+    380, 9, 20, 65, 2, 460,
+    650, 9, 3, 92, 5, 1000
+  ),
+  nrow = 6, byrow = TRUE
+)
+
+datos_alternativas <- as.data.frame(matriz_datos)
+colnames(datos_alternativas) <- c("C1.1_CosteVida", "C1.2_Ambiente", "C2.1_Ranking", "C2.2_Investig", "C3.1_Dificultad", "C3.2_Cercania")
+rownames(datos_alternativas) <- c("A1_UC3M", "A2_UCM", "A3_US", "A4_UGR", "A5_USAL", "A6_UB")
+
+cat("--- 1. Matriz de Decisión ---")
+kable(datos_alternativas, caption = "1. Matriz de Decisión")
+
+```
+
+#Aplicacion AHP
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+cat("--- 2. Resultados AHP (Pesos Manuales) ---")
+
+# --- ASIGNACIÓN MANUAL DE PESOS ---
+# Pesos de supercriterios (Nivel 1)
+peso_global_c1 <- 0.50
+peso_global_c2 <- 0.25
+peso_global_c3 <- 0.25
+
+# Pesos locales de subcriterios (Nivel 2)
+# C1: 50% Coste, 50% Ambiente
+pesos_c1 <- c(0.50, 0.50) 
+# C2: 80% Ranking, 20% Investig
+pesos_c2 <- c(0.80, 0.20) 
+# C3: 42% Dificultad, 58% Cercania
+pesos_c3 <- c(0.42, 0.58) 
+# --- FIN ASIGNACIÓN MANUAL ---
+
+pesos_locales <- c(pesos_c1[1], pesos_c1[2], pesos_c2[1], pesos_c2[2], pesos_c3[1], pesos_c3[2])
+pesos_padre <- c(peso_global_c1, peso_global_c1, peso_global_c2, peso_global_c2, peso_global_c3, peso_global_c3)
+pesos_globales_vector <- pesos_locales * pesos_padre
+
+tabla_pesos <- data.frame(
+  Criterio_Principal = c("C1_Ciudad", "C1_Ciudad", "C2_Rendimiento", "C2_Rendimiento", "C3_Acceso", "C3_Acceso"),
+  Subcriterio = c("C1.1_Coste", "C1.2_Ambiente", "C2.1_Ranking", "C2.2_Investig", "C3.1_Dificultad", "C3.2_Cercania"),
+  Peso_Local = pesos_locales,
+  Peso_Criterio_Padre = pesos_padre,
+  Peso_Global = pesos_globales_vector
+)
+
+cat("--- Tabla de Pesos AHP (Locales y Globales) ---")
+columnas_numericas <- c("Peso_Local", "Peso_Criterio_Padre", "Peso_Global")
+tabla_pesos[columnas_numericas] <- round(tabla_pesos[columnas_numericas], 4)
+
+kable(tabla_pesos, caption = "2. Tabla de Pesos AHP (Locales y Globales)")
+
+
+datos_ahp <- datos_alternativas
+
+datos_ahp$C1.1_CosteVida <- max(datos_ahp$C1.1_CosteVida) - datos_ahp$C1.1_CosteVida
+datos_ahp$C2.1_Ranking <- max(datos_ahp$C2.1_Ranking) - datos_ahp$C2.1_Ranking
+datos_ahp$C3.1_Dificultad <- max(datos_ahp$C3.1_Dificultad) - datos_ahp$C3.1_Dificultad
+datos_ahp$C3.2_Cercania <- max(datos_ahp$C3.2_Cercania) - datos_ahp$C3.2_Cercania
+
+matriz_normalizada <- multicriterio.homogeneizacion.nadir(datos_ahp)
+
+puntuaciones_AHP <- as.matrix(matriz_normalizada) %*% pesos_globales_vector
+
+ranking_AHP <- data.frame(
+  Alternativa = rownames(datos_alternativas),
+  Puntuacion_AHP = as.numeric(puntuaciones_AHP)
+)
+ranking_AHP <- ranking_AHP[order(ranking_AHP$Puntuacion_AHP, decreasing = TRUE), ]
+ranking_AHP$Ranking_AHP <- 1:nrow(ranking_AHP)
+
+cat("--- 3. Ranking AHP (SAW) ---")
+ranking_AHP$Puntuacion_AHP <- round(ranking_AHP$Puntuacion_AHP, 4)
+
+kable(ranking_AHP, caption = "3. Ranking AHP (SAW)")
+
+print(
+  ggplot(ranking_AHP, aes(x = reorder(Alternativa, Puntuacion_AHP), y = Puntuacion_AHP, fill = Alternativa)) +
+    geom_bar(stat = "identity", width = 0.7) +
+    geom_text(aes(label = sprintf("%.4f", Puntuacion_AHP)), hjust = 1.2, color = "white", fontface = "bold") +
+    labs(title = "Ranking de Universidades (AHP / SAW)",
+         x = "Universidad",
+         y = "Puntuación Final Ponderada") +
+    theme_minimal() +
+    theme(legend.position = "none") +
+    coord_flip()
+)
+
+```
+
+#Ponderación de Criterios (Método AHP)
+
+### AHPconR: Interpretación de la salida del método AHP
+
+Para este análisis, los pesos se han asignado **manualmente** para reflejar las prioridades del decisor, en lugar de calcularse a partir de matrices de comparación por pares.
+
+La prioridad más importante es **C1: Ciudad (50.0%)**, seguida de **C2: Rendimiento Académico (25.0%)** y **C3: Acceso y Conveniencia (25.0%)**. Esto refleja que, como estudiantes, priorizamos los aspectos del entorno y el coste de vida.
+
+Dentro de **Ciudad**, el `Coste de Vida` (50%) y el `Ambiente Social` (50%) tienen el mismo peso.
+En **Rendimiento Académico**, el `Ranking` (80%) domina sobre la `Investigación` (20%).
+En **Acceso y Conveniencia**, la `Cercanía a Casa` (58%) tiene un peso ligeramente mayor que la `Dificultad de Acceso` (42%).
+
+**Conclusión:** Los pesos se han asignado manualmente para reflejar esta estructura de prioridades. Al no usar matrices de comparación, no se calcula un ratio de consistencia (RI/CI).
+
+Con la tabla de los pesos se pueden calcular los pesos globales de cada subcriterio, multiplicando los pesos de los subcriterios por los pesos del criterio padre:
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+datos_electre <- datos_alternativas
+pesos_electre <- pesos_globales_vector
+
+datos_electre$C1.1_CosteVida <- -datos_electre$C1.1_CosteVida
+datos_electre$C2.1_Ranking <- -datos_electre$C2.1_Ranking
+datos_electre$C3.1_Dificultad <- -datos_electre$C3.1_Dificultad
+datos_electre$C3.2_Cercania <- -datos_electre$C3.2_Cercania
+
+res_electre <- multicriterio.metodoelectre_varlibro(
+  Mvalor = as.matrix(datos_electre),
+  pesos.criterios = pesos_electre
+)
+
+cat("--- 4. Resultados ELECTRE I ---")
+cat(paste("Umbral Concordancia Medio:", round(res_electre$umbral.c.medio, 4)))
+cat(paste("Umbral Discordancia Medio:", round(res_electre$umbral.d.medio, 4)))
+cat("Matriz de Dominancia Agregada (1=Supera):")
+kable(res_electre$Minddominancia_agregada, caption = "4a. Matriz de Dominancia (1=Supera)")
+
+cat("Núcleo (Alternativas no dominadas):")
+kable(data.frame(Alternativa = names(res_electre$nucleo_aprox)), caption = "4b. Núcleo (Alternativas no dominadas)")
+
+
+tab_fpref <- matrix(c(
+  5, 50, 200, 0,
+  3, 0, 2, 0,
+  5, 2, 10, 0,
+  5, 5, 20, 0,
+  3, 0, 2, 0,
+  5, 100, 500, 0
+), nrow = 6, byrow = TRUE)
+
+fminmax <- c("min", "max", "min", "max", "min", "min")
+
+res_promethee <- multicriterio.metodo.promethee_windows(
+  matdecision = as.matrix(datos_alternativas),
+  tab.fpref = tab_fpref,
+  pesos.criterios = pesos_globales_vector,
+  fminmax = fminmax
+)
+
+```
+
+# ELECTRE
+
+Coherencia con AHP: El resultado de ELECTRE I es coherente con la filosofía de pesos del método AHP (donde Ciudad es el criterio principal más pesado, 50% del peso global).
+
+Ganador (Núcleo): {A4_UGR}. La Universidad de Granada es la única alternativa que forma el núcleo de la solución.
+
+Justificación: La Matriz de Dominancia (Generada en el chunk electre_calculo) muestra que la A4_UGR supera a todas las demás (tendría un '1' en todas las columnas de la fila A4) y, a su vez, no es superada por ninguna (la columna A4 sumaría 0).
+
+* **Paso a paso:** Es un metodo no compensatorio. Los criterios de minimizacion se invierten (multiplicando por -1) para que todos sean de maximizacion.
+* **Pesos distintos a AHP:** No, se utilizan los **mismos pesos** (`pesos_globales_vector`) de AHP (50/25/25 para criterios principales) para mantener la coherencia en la comparativa de métodos.
+* **Un solo paso y Salidas:** Se ejecuta en un solo paso. Solo se imprimen los resultados clave: la Matriz de Dominancia y el Núcleo.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+cat("--- 5. Ranking PROMETHEE II (Flujos Netos) ---")
+kable(round(res_promethee$Acciones, 4), caption = "5. Ranking PROMETHEE II (Flujos Netos)")
+```
+
+# Aplicación del método PROMETHEE II
+
+### Promethee: Explicaciones del Método
+
+* **Pesos distintos a AHP:** Se utilizan los **mismos pesos** (`pesos_globales_vector`) de AHP (50/25/25 para criterios principales) para asegurar una comparativa justa.
+* **Explicaciones:** La clave de PROMETHEE es el uso de **Funciones de Preferencia** (`tab_fpref`). Estas funciones modelan cómo el decisor percibe la diferencia entre dos alternativas, lo que permite un análisis más detallado que la simple suma ponderada (SAW). Por ejemplo, el Coste de Vida utiliza una función "Linear" con indiferencia (Q=50€), lo que suaviza las pequeñas diferencias de precio.
+
+El resultado de PROMETHEE II revela una clasificación de equilibrio que difiere notablemente del AHP/SAW.Ganador: A6_UB (Universidad de Barcelona). La A6, a pesar de su alto coste y lejanía, presenta el mayor Flujo Neto ($\Phi = 0.3068$).
+
+Justificación: PROMETHEE premia la excelencia en el criterio más pesado (C1_Ciudad, 50% del peso, donde A6 tiene un Ambiente Social alto) y la ausencia de grandes debilidades no compensadas. En este escenario, la UB es percibida como la mejor, seguida de A2_UCM (2º puesto) y A1_UC3M (3er puesto).
+
+Flujos Netos: La UGR y la USAL, que ganaron en el AHP (con los pesos anteriores) o son opciones fuertes en coste, son penalizadas aquí por su rendimiento académico relativamente bajo, lo que genera flujos netos negativos.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+rank_ahp_final <- ranking_AHP[order(ranking_AHP$Alternativa), "Ranking_AHP"]
+
+matriz_dominancia <- res_electre$Minddominancia_agregada
+dominancia_saliente <- rowSums(matriz_dominancia, na.rm = TRUE)
+dominancia_entrante <- colSums(matriz_dominancia, na.rm = TRUE)
+flujo_neto_electre <- dominancia_saliente - dominancia_entrante
+
+ranking_electre_df <- data.frame(
+  Alternativa = names(flujo_neto_electre),
+  FlujoNeto = flujo_neto_electre
+)
+ranking_electre_df <- ranking_electre_df[order(ranking_electre_df$FlujoNeto, decreasing = TRUE), ]
+ranking_electre_df$Ranking_ELECTRE <- rank(-ranking_electre_df$FlujoNeto, ties.method = "min")
+
+rank_electre_final <- ranking_electre_df[order(ranking_electre_df$Alternativa), "Ranking_ELECTRE"]
+
+rank_promethee_final <- res_promethee$Acciones[order(rownames(res_promethee$Acciones)), "Rango"]
+
+tabla_comparativa <- data.frame(
+  Alternativa = rownames(datos_alternativas),
+  Ranking_AHP = rank_ahp_final,
+  Ranking_ELECTRE = rank_electre_final,
+  Ranking_PROMETHEE = rank_promethee_final
+)
+
+cat("--- 6. Tabla Comparativa de Rankings ---")
+kable(tabla_comparativa, caption = "6. Tabla Comparativa de Rankings")
+```
+
+
+
+# Conclusión Final y Justificación de Diferencias
+
+**Consistencia de resultados:**
+
+Existe una **clara divergencia** entre los métodos. **Ninguna alternativa es claramente superior en todos los escenarios**, lo cual es un hallazgo importante del análisis multicriterio.
+
+* **AHP/ELECTRE:** Favorecen a **A4_UGR** (Granada), debido a su excelente desempeño en los criterios altamente ponderados (`C1_Ciudad`, `C2_Rendimiento`) y su posición robusta en el test de no-dominancia (Núcleo ELECTRE).
+* **PROMETHEE II:** Selecciona a **A6_UB** (Barcelona), demostrando que, bajo la lógica de preferencias suaves, el alto rendimiento en `Ambiente Social` y `Investigación` compensa su alto coste y lejanía.
+
+---
+
+### Justificación de las Diferencias Metodológicas
+
+La disparidad de resultados entre los métodos (AHP/ELECTRE vs. PROMETHEE II) se explica por cómo cada uno maneja el principio de **Compensación**:
+
+1.  **AHP y ELECTRE (Visión Estricta):**
+    * Ambos métodos son fuertemente guiados por los **pesos globales** (donde `C1_Ciudad` = 50% y `C2_Rendimiento` = 25%).
+    * **AHP** (SAW) es totalmente **compensatorio**: una nota alta en el 50% de peso (Coste/Ambiente) puede compensar totalmente una baja nota en otro lado. Esto beneficia a **A4_UGR** por su balance superior en Coste/Ambiente.
+    * **ELECTRE I** es **parcialmente no compensatorio**: al aplicar los umbrales (C/D), verifica que una alternativa no tenga una debilidad crítica en ningún criterio importante. El alto rendimiento de A4_UGR en el criterio más pesado (`Ciudad`) le permite superar el umbral de concordancia y **evitar ser dominada**, confirmando el resultado de AHP.
+
+2.  **PROMETHEE II (Visión Equilibrada y Suave):**
+    * Este método utiliza **funciones de preferencia** que suavizan las penalizaciones.
+    * **A6_UB** (Barcelona) gana porque, aunque es la peor en `Cercanía` y `Coste`, estas penalizaciones son suavizadas por los umbrales de indiferencia. Su máxima puntuación en `Investigación` y `Ambiente Social` (donde tiene el mayor desempeño) genera un **Flujo Saliente ($\Phi^{+}$) muy alto**, resultando en el mejor Flujo Neto global.
+
+### Decisión Final
+
+* Si la **prioridad es el equilibrio entre el Coste de Vida/Ambiente y la Cercanía** (reflejando la alta ponderación del 75% en C1+C3), la decisión más robusta es **A4: UGR**.
+* Si la prioridad es la **máxima calidad académica y ambiental**, la decisión es **A6: UB** (según PROMETHEE).
+* Al existir un fuerte consenso entre AHP y ELECTRE I, la **A4: UGR** se considera la opción óptima bajo la estructura de prioridades definida.
