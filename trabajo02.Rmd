@@ -278,6 +278,7 @@ kable(round(res_promethee$Acciones, 4), caption = "5. Ranking PROMETHEE II (Fluj
 
 ### Promethee: Explicaciones del Método
 
+* **Promethee R y Windows:** El análisis se realiza íntegramente en R, utilizando la función `multicriterio.metodo.promethee_windows`.
 * **Pesos distintos a AHP:** Se utilizan los **mismos pesos** (`pesos_globales_vector`) de AHP (50/25/25 para criterios principales) para asegurar una comparativa justa.
 * **Explicaciones:** La clave de PROMETHEE es el uso de **Funciones de Preferencia** (`tab_fpref`). Estas funciones modelan cómo el decisor percibe la diferencia entre dos alternativas, lo que permite un análisis más detallado que la simple suma ponderada (SAW). Por ejemplo, el Coste de Vida utiliza una función "Linear" con indiferencia (Q=50€), lo que suaviza las pequeñas diferencias de precio.
 
